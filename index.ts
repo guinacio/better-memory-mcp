@@ -1086,6 +1086,8 @@ server.registerTool(
     title: "Search Nodes",
     description: `Search for nodes in the knowledge graph with advanced query support.
 
+Use for entity discovery: "what modules exist", "find all services related to auth", "which components handle payments". Returns full entities with all observations. Best when you need complete context about something or don't know what entities exist.
+
 Query Syntax:
 - Multiple words: OR logic (matches any word)
 - +term: Required (must be present)
@@ -1324,8 +1326,7 @@ server.registerTool(
     title: "Search Observations",
     description: `Search at the observation level, returning individual matching observations with their parent entity context.
 
-More efficient than search_nodes when you need specific facts rather than entire entities.
-Reduces token usage by returning only relevant observations instead of full entity data.
+Use for fact-finding: "when was X deprecated", "what's the status of Y", "why did we choose Z". Returns individual observations without entity bloat. Best when you need specific information buried within large entities, or when searching across a codebase for scattered implementation notes.
 
 Query Syntax (same as search_nodes):
 - Multiple words: OR logic (matches any word)
