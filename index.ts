@@ -1335,9 +1335,9 @@ Query Syntax (same as search_nodes):
 - "phrase": Exact phrase match
 
 Examples:
-- "interview LabV" - finds observations mentioning interview OR LabV
-- "+interview +German" - finds observations with BOTH terms
-- "project -cancelled" - finds project mentions excluding cancelled ones`,
+- "auth security" - finds observations mentioning auth OR security
+- "+deprecated +2024" - finds observations with BOTH terms
+- "TODO -completed" - finds TODO mentions excluding completed ones`,
     inputSchema: {
       query: z.string().describe("The search query (supports boolean operators)"),
       limit: z.number().optional()
