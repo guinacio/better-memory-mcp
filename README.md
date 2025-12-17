@@ -144,6 +144,24 @@ Example:
     - Relations between requested entities
   - Silently skips non-existent nodes
 
+- **search_observations** (New)
+  - Search at the observation level, returning individual matching observations instead of entire entities
+  - More efficient than `search_nodes` when you need specific facts rather than full entity data
+  - Reduces token usage by returning only relevant observations
+  - Input:
+    - `query` (string): Search query (same syntax as search_nodes)
+    - `limit` (number, optional): Maximum observations to return (default: 10)
+    - `includeEntity` (boolean, optional): Include full parent entities in response
+    - `fuzzy` (boolean, optional): Enable fuzzy matching for typo tolerance
+  - Returns:
+    - `matches`: Array of matching observations with:
+      - `entityName`: Parent entity name
+      - `entityType`: Parent entity type
+      - `observation`: The matching observation text
+      - `score`: Relevance score
+    - `entities` (optional): Full parent entities if `includeEntity` is true
+  - Example query: `"+interview +German"` returns only observations containing both terms
+
 ### Graph Traversal Tools
 
 - **get_neighbors**

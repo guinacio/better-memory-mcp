@@ -26,16 +26,22 @@ Test the memory MCP by doing the following:
    - Search with exclusion: "project -Rust"
    - Search with field prefix: "type:person"
 
-4. Test graph traversal:
+4. Test observation-level search:
+   - Search observations for "engineer" (should return just the matching observation, not the full entity)
+   - Search observations with boolean: "+AI +startup"
+   - Search observations with limit: 2
+   - Search observations with includeEntity: true to also get full parent entities
+
+5. Test graph traversal:
    - Get neighbors of Alice
    - Find path from Alice to GraphDB
    - Get 1-hop subgraph around TechCorp
 
-5. Test filtering:
+6. Test filtering:
    - Filter by type "person"
    - Filter relations where fromEntity is "Alice"
 
-6. Read the full graph to verify everything was stored correctly.
+7. Read the full graph to verify everything was stored correctly.
 
 Report what you find at each step.
 ```

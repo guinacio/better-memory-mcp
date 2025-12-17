@@ -111,6 +111,28 @@ export interface PathResult {
   [key: string]: unknown;
 }
 
+// Observation match result structure
+export interface ObservationMatch {
+  entityName: string;
+  entityType: string;
+  observation: string;
+  score: number;
+}
+
+// Observation search options
+export interface ObservationSearchOptions {
+  limit?: number;
+  includeEntity?: boolean;
+  fuzzy?: boolean;
+}
+
+// Observation search result
+export interface ObservationSearchResult {
+  matches: ObservationMatch[];
+  entities?: Entity[];  // Only populated if includeEntity is true
+  [key: string]: unknown;
+}
+
 // The KnowledgeGraphManager class contains all operations to interact with the knowledge graph
 export class KnowledgeGraphManager {
   constructor(private memoryFilePath: string) {}
@@ -764,6 +786,111 @@ export class KnowledgeGraphManager {
       e.observations.some(obs => regex.test(obs))
     );
   }
+
+  // ==================== Observation-Level Search ====================
+
+  /**
+   * Score an individual observation's relevance to a search query
+   */
+  private scoreObservation(observation: string, query: string, fuzzy: boolean = false): number {
+    const queryLower = query.toLowerCase();
+    const obsLower = observation.toLowerCase();
+    const tokens = this.tokenize(query);
+    let score = 0;
+
+    // Exact query match in observation
+    if (obsLower.includes(queryLower)) {
+      score += 100;
+    }
+
+    // Token matches (cumulative)
+    for (const token of tokens) {
+      if (obsLower.includes(token)) {
+        score += 20;
+      } else if (fuzzy && this.fuzzyMatch(observation, token)) {
+        score += 10;
+      }
+    }
+
+    // Bonus for match at start of observation
+    if (obsLower.startsWith(queryLower) || tokens.some(t => obsLower.startsWith(t))) {
+      score += 15;
+    }
+
+    return score;
+  }
+
+  /**
+   * Search at the observation level, returning individual matching observations
+   * with their parent entity context.
+   *
+   * This is more efficient than search_nodes when you need specific facts
+   * rather than entire entities.
+   */
+  async searchObservations(
+    query: string,
+    options: ObservationSearchOptions = {}
+  ): Promise<ObservationSearchResult> {
+    const graph = await this.loadGraph();
+    const { limit = 10, includeEntity = false, fuzzy = false } = options;
+
+    // Handle empty query
+    if (!query.trim()) {
+      return { matches: [] };
+    }
+
+    // Parse the query for boolean operators
+    const parsed = this.parseQuery(query);
+
+    // Collect all matching observations with scores
+    const allMatches: ObservationMatch[] = [];
+
+    for (const entity of graph.entities) {
+      for (const observation of entity.observations) {
+        // Check if observation matches the query
+        if (!this.matchesParsedQuery(observation, parsed)) {
+          // Try fuzzy matching if enabled
+          if (fuzzy) {
+            const allTerms = [...parsed.required, ...parsed.optional, ...parsed.phrases];
+            if (!allTerms.some(term => this.fuzzyMatch(observation, term))) {
+              continue;
+            }
+          } else {
+            continue;
+          }
+        }
+
+        // Calculate relevance score
+        const rawQuery = query.replace(/[+\-"]/g, ' ').trim();
+        const score = this.scoreObservation(observation, rawQuery, fuzzy);
+
+        if (score > 0) {
+          allMatches.push({
+            entityName: entity.name,
+            entityType: entity.entityType,
+            observation,
+            score
+          });
+        }
+      }
+    }
+
+    // Sort by score descending
+    allMatches.sort((a, b) => b.score - a.score);
+
+    // Apply limit
+    const limitedMatches = allMatches.slice(0, limit);
+
+    // Optionally include full entities
+    const result: ObservationSearchResult = { matches: limitedMatches };
+
+    if (includeEntity && limitedMatches.length > 0) {
+      const entityNames = new Set(limitedMatches.map(m => m.entityName));
+      result.entities = graph.entities.filter(e => entityNames.has(e.name));
+    }
+
+    return result;
+  }
 }
 
 let knowledgeGraphManager: KnowledgeGraphManager;
@@ -1186,6 +1313,54 @@ Or provide a custom regex pattern.`,
     return {
       content: [{ type: "text" as const, text: JSON.stringify({ entities }, null, 2) }],
       structuredContent: { entities }
+    };
+  }
+);
+
+// Register search_observations tool
+server.registerTool(
+  "search_observations",
+  {
+    title: "Search Observations",
+    description: `Search at the observation level, returning individual matching observations with their parent entity context.
+
+More efficient than search_nodes when you need specific facts rather than entire entities.
+Reduces token usage by returning only relevant observations instead of full entity data.
+
+Query Syntax (same as search_nodes):
+- Multiple words: OR logic (matches any word)
+- +term: Required (must be present)
+- -term: Excluded (must NOT be present)
+- "phrase": Exact phrase match
+
+Examples:
+- "interview LabV" - finds observations mentioning interview OR LabV
+- "+interview +German" - finds observations with BOTH terms
+- "project -cancelled" - finds project mentions excluding cancelled ones`,
+    inputSchema: {
+      query: z.string().describe("The search query (supports boolean operators)"),
+      limit: z.number().optional()
+        .describe("Maximum number of observations to return (default: 10)"),
+      includeEntity: z.boolean().optional()
+        .describe("Include full parent entities in response (default: false)"),
+      fuzzy: z.boolean().optional()
+        .describe("Enable fuzzy matching for typo tolerance (default: false)")
+    },
+    outputSchema: {
+      matches: z.array(z.object({
+        entityName: z.string(),
+        entityType: z.string(),
+        observation: z.string(),
+        score: z.number()
+      })),
+      entities: z.array(EntitySchema).optional()
+    }
+  },
+  async ({ query, limit, includeEntity, fuzzy }) => {
+    const result = await knowledgeGraphManager.searchObservations(query, { limit, includeEntity, fuzzy });
+    return {
+      content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+      structuredContent: result
     };
   }
 );

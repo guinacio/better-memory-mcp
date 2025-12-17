@@ -790,4 +790,127 @@ describe('KnowledgeGraphManager', () => {
       expect(result[0].name).toBe('Entity5');
     });
   });
+
+  describe('searchObservations', () => {
+    beforeEach(async () => {
+      await manager.createEntities([
+        {
+          name: 'Guilherme',
+          entityType: 'Person',
+          observations: [
+            '[2025-11-26] Interviewing with LabV Intelligent Solutions GmbH',
+            '[2025-11-26] Passed first round interview',
+            '[2025-12-01] Working on React project',
+            'Lives in Germany'
+          ]
+        },
+        {
+          name: 'TechCorp',
+          entityType: 'Company',
+          observations: [
+            'AI startup founded in 2020',
+            'Uses React and TypeScript',
+            'Interviewing candidates'
+          ]
+        },
+        {
+          name: 'ProjectX',
+          entityType: 'Project',
+          observations: [
+            'React application',
+            'Uses TypeScript',
+            'Deadline: December 2025'
+          ]
+        }
+      ]);
+    });
+
+    it('should return matching observations with entity context', async () => {
+      const result = await manager.searchObservations('LabV');
+      expect(result.matches).toHaveLength(1);
+      expect(result.matches[0].entityName).toBe('Guilherme');
+      expect(result.matches[0].entityType).toBe('Person');
+      expect(result.matches[0].observation).toContain('LabV');
+      expect(result.matches[0].score).toBeGreaterThan(0);
+    });
+
+    it('should return multiple matching observations from same entity', async () => {
+      const result = await manager.searchObservations('interview', { limit: 10 });
+      expect(result.matches.length).toBeGreaterThanOrEqual(2);
+      // Should find observations from both Guilherme and TechCorp
+      const entityNames = result.matches.map(m => m.entityName);
+      expect(entityNames).toContain('Guilherme');
+      expect(entityNames).toContain('TechCorp');
+    });
+
+    it('should respect limit parameter', async () => {
+      const result = await manager.searchObservations('React', { limit: 2 });
+      expect(result.matches).toHaveLength(2);
+    });
+
+    it('should sort by relevance score descending', async () => {
+      const result = await manager.searchObservations('React TypeScript');
+      for (let i = 1; i < result.matches.length; i++) {
+        expect(result.matches[i - 1].score).toBeGreaterThanOrEqual(result.matches[i].score);
+      }
+    });
+
+    it('should support boolean AND with + operator', async () => {
+      const result = await manager.searchObservations('+interview +LabV');
+      expect(result.matches).toHaveLength(1);
+      expect(result.matches[0].observation).toContain('LabV');
+    });
+
+    it('should support exclusion with - operator', async () => {
+      const result = await manager.searchObservations('interview -LabV');
+      // Should find TechCorp's "Interviewing candidates" but not LabV observation
+      expect(result.matches.length).toBeGreaterThanOrEqual(1);
+      result.matches.forEach(m => {
+        expect(m.observation.toLowerCase()).not.toContain('labv');
+      });
+    });
+
+    it('should support exact phrase matching', async () => {
+      const result = await manager.searchObservations('"first round"');
+      expect(result.matches).toHaveLength(1);
+      expect(result.matches[0].observation).toContain('first round');
+    });
+
+    it('should return empty results for non-matching query', async () => {
+      const result = await manager.searchObservations('nonexistent');
+      expect(result.matches).toHaveLength(0);
+    });
+
+    it('should handle empty query', async () => {
+      const result = await manager.searchObservations('');
+      expect(result.matches).toHaveLength(0);
+    });
+
+    it('should include full entities when includeEntity is true', async () => {
+      const result = await manager.searchObservations('LabV', { includeEntity: true });
+      expect(result.entities).toBeDefined();
+      expect(result.entities).toHaveLength(1);
+      expect(result.entities![0].name).toBe('Guilherme');
+      expect(result.entities![0].observations).toHaveLength(4);
+    });
+
+    it('should not include entities when includeEntity is false', async () => {
+      const result = await manager.searchObservations('LabV', { includeEntity: false });
+      expect(result.entities).toBeUndefined();
+    });
+
+    it('should support fuzzy matching when enabled', async () => {
+      // "Recat" is a typo for "React" (transposition - distance of 2, but substring match works)
+      const result = await manager.searchObservations('Rect', { fuzzy: true });
+      expect(result.matches.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('should find dated observations', async () => {
+      const result = await manager.searchObservations('[2025-11-26]');
+      expect(result.matches).toHaveLength(2);
+      result.matches.forEach(m => {
+        expect(m.observation).toContain('[2025-11-26]');
+      });
+    });
+  });
 });
