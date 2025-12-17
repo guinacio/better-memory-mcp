@@ -1,0 +1,37 @@
+{
+  "name": "@guinacio/better-memory-mcp",
+  "version": "1.0.0",
+  "description": "Enhanced fork of @modelcontextprotocol/server-memory with advanced search, graph traversal, and filtering for knowledge graphs",
+  "license": "MIT",
+  "author": "guinacio",
+  "homepage": "https://github.com/guinacio/better-memory-mcp",
+  "bugs": "https://github.com/guinacio/better-memory-mcp/issues",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/guinacio/better-memory-mcp.git"
+  },
+  "type": "module",
+  "bin": {
+    "better-memory-mcp": "dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc && shx chmod +x dist/*.js",
+    "prepare": "npm run build",
+    "watch": "tsc --watch",
+    "test": "vitest run --coverage"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.24.0"
+  },
+  "devDependencies": {
+    "@rollup/rollup-win32-x64-msvc": "^4.53.5",
+    "@types/node": "^22",
+    "@vitest/coverage-v8": "^2.1.8",
+    "shx": "^0.3.4",
+    "typescript": "^5.6.2",
+    "vitest": "^2.1.8"
+  }
+}
