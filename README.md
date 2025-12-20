@@ -4,6 +4,16 @@
 
 A full-featured persistent memory system using a local knowledge graph. This lets Claude remember information about the user across chats, with advanced search, graph traversal, and filtering capabilities.
 
+## What's New vs. @modelcontextprotocol/server-memory
+
+| Feature | server-memory | better-memory-mcp |
+|---------|---------------|-------------------|
+| **Advanced Search** | Basic substring matching | Boolean operators (`+required`, `-excluded`), field prefixes (`name:`, `type:`, `obs:`), exact phrases, fuzzy matching |
+| **Graph Traversal** | Not available | `get_neighbors`, `find_path` (shortest path), `get_subgraph` (N-hop extraction) |
+| **Filtering** | Not available | Filter by entity type, relation type, observation patterns (dated, techdebt, deprecated) |
+| **Observation Search** | Search returns full entities | `search_observations` returns individual matching facts with relevance scores |
+| **Desktop Extension** | Manual config only | One-click `.mcpb` install for Claude Desktop |
+
 ## Core Concepts
 
 ### Entities
