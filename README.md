@@ -342,6 +342,23 @@ Follow these steps for each interaction:
    - Use filter_observations with "techdebt" or "deprecated" to find items needing attention
 ```
 
+### Codebase Knowledge Graph Prompts
+
+The `example_prompts/` directory contains ready-to-use system prompts for building knowledge graphs of codebases:
+
+| Prompt | Purpose |
+|--------|---------|
+| [CLAUDE.md](example_prompts/CLAUDE.md) | Integration protocol for maintaining a codebase memory graph during development sessions |
+| [codebase_graph_agent_prompt.md](example_prompts/codebase_graph_agent_prompt.md) | Complete 7-phase agent prompt for building knowledge graphs from scratch |
+
+These prompts help Claude:
+- Build persistent memory of codebase structure, patterns, and decisions
+- Maintain dated observations with `[YYYY-MM-DD]` format
+- Track relationships between modules, services, and components
+- Document non-obvious quirks, tech debt, and architectural decisions
+
+**Tip:** Turn `codebase_graph_agent_prompt.md` into a Claude Code [custom slash command](https://docs.anthropic.com/en/docs/claude-code/slash-commands) or [subagent](https://docs.anthropic.com/en/docs/claude-code/sub-agents) to automate codebase graph maintenance as part of your development workflow.
+
 ## Development
 
 ### Build
