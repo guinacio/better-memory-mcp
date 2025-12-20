@@ -1,0 +1,123 @@
+{
+  "manifest_version": "0.3",
+  "name": "better-memory-mcp",
+  "display_name": "Better Memory",
+  "version": "1.0.0",
+  "description": "Persistent knowledge graph memory for Claude with advanced search, graph traversal, and filtering capabilities",
+  "long_description": "Enhanced fork of @modelcontextprotocol/server-memory that provides Claude with persistent memory across conversations using a local knowledge graph.\n\n## Key Features\n\n- **Knowledge Graph Storage**: Store entities with types and observations, connected by typed relations\n- **Advanced Search**: Boolean operators (+required, -excluded, \"exact phrase\"), field-specific queries (name:, type:, obs:), fuzzy matching\n- **Graph Traversal**: Find neighbors, shortest paths, and extract N-hop subgraphs\n- **Filtering**: Filter by entity type, relation type, or observation patterns\n- **Observation Search**: Search individual facts within entities for efficient fact-finding\n\n## Use Cases\n\n- Remember user preferences and context across conversations\n- Track project structures, dependencies, and relationships\n- Maintain notes and observations with dated entries\n- Build semantic knowledge bases that persist locally",
+  "author": {
+    "name": "guinacio",
+    "url": "https://github.com/guinacio"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/guinacio/better-memory-mcp.git"
+  },
+  "homepage": "https://github.com/guinacio/better-memory-mcp",
+  "documentation": "https://github.com/guinacio/better-memory-mcp#readme",
+  "support": "https://github.com/guinacio/better-memory-mcp/issues",
+  "license": "MIT",
+  "icon": "icon.png",
+  "keywords": [
+    "memory",
+    "knowledge-graph",
+    "persistence",
+    "search",
+    "graph",
+    "entities",
+    "relations"
+  ],
+  "server": {
+    "type": "node",
+    "entry_point": "dist/index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": ["${__dirname}/dist/index.js"],
+      "env": {
+        "MEMORY_FILE_PATH": "${user_config.memory_file_path}"
+      }
+    }
+  },
+  "tools": [
+    {
+      "name": "create_entities",
+      "description": "Create multiple new entities in the knowledge graph"
+    },
+    {
+      "name": "create_relations",
+      "description": "Create multiple new relations between entities in the knowledge graph"
+    },
+    {
+      "name": "add_observations",
+      "description": "Add new observations to existing entities in the knowledge graph"
+    },
+    {
+      "name": "delete_entities",
+      "description": "Delete multiple entities and their associated relations from the knowledge graph"
+    },
+    {
+      "name": "delete_observations",
+      "description": "Delete specific observations from entities in the knowledge graph"
+    },
+    {
+      "name": "delete_relations",
+      "description": "Delete multiple relations from the knowledge graph"
+    },
+    {
+      "name": "read_graph",
+      "description": "Read the entire knowledge graph"
+    },
+    {
+      "name": "search_nodes",
+      "description": "Search for nodes in the knowledge graph with advanced query support including boolean operators and field prefixes"
+    },
+    {
+      "name": "open_nodes",
+      "description": "Open specific nodes in the knowledge graph by their names"
+    },
+    {
+      "name": "get_neighbors",
+      "description": "Get all entities directly connected to a given entity via relations"
+    },
+    {
+      "name": "find_path",
+      "description": "Find the shortest path between two entities in the knowledge graph"
+    },
+    {
+      "name": "get_subgraph",
+      "description": "Extract a subgraph containing specified entities and their N-hop neighborhood"
+    },
+    {
+      "name": "filter_by_type",
+      "description": "Get all entities of a specific type"
+    },
+    {
+      "name": "filter_relations",
+      "description": "Filter relations by type, source entity, or target entity"
+    },
+    {
+      "name": "filter_observations",
+      "description": "Find entities with observations matching a pattern"
+    },
+    {
+      "name": "search_observations",
+      "description": "Search at the observation level, returning individual matching observations with parent entity context"
+    }
+  ],
+  "user_config": {
+    "memory_file_path": {
+      "type": "file",
+      "title": "Memory File Path",
+      "description": "Path to the JSONL file where the knowledge graph is stored. Leave empty to use the default location.",
+      "required": false,
+      "default": ""
+    }
+  },
+  "compatibility": {
+    "claude_desktop": ">=0.10.0",
+    "platforms": ["darwin", "win32", "linux"],
+    "runtimes": {
+      "node": ">=18.0.0"
+    }
+  }
+}

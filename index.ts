@@ -910,8 +910,8 @@ const RelationSchema = z.object({
 
 // The server instance and tools exposed to Claude
 const server = new McpServer({
-  name: "memory-server",
-  version: "0.6.3",
+  name: "better-memory-mcp",
+  version: "1.0.0",
 });
 
 // Register create_entities tool
@@ -923,8 +923,11 @@ server.registerTool(
     inputSchema: {
       entities: z.array(EntitySchema)
     },
-    outputSchema: {
-      entities: z.array(EntitySchema)
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false
     }
   },
   async ({ entities }) => {
@@ -945,8 +948,11 @@ server.registerTool(
     inputSchema: {
       relations: z.array(RelationSchema)
     },
-    outputSchema: {
-      relations: z.array(RelationSchema)
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false
     }
   },
   async ({ relations }) => {
@@ -970,11 +976,11 @@ server.registerTool(
         contents: z.array(z.string()).describe("An array of observation contents to add")
       }))
     },
-    outputSchema: {
-      results: z.array(z.object({
-        entityName: z.string(),
-        addedObservations: z.array(z.string())
-      }))
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false
     }
   },
   async ({ observations }) => {
@@ -995,9 +1001,11 @@ server.registerTool(
     inputSchema: {
       entityNames: z.array(z.string()).describe("An array of entity names to delete")
     },
-    outputSchema: {
-      success: z.boolean(),
-      message: z.string()
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: false
     }
   },
   async ({ entityNames }) => {
@@ -1021,9 +1029,11 @@ server.registerTool(
         observations: z.array(z.string()).describe("An array of observations to delete")
       }))
     },
-    outputSchema: {
-      success: z.boolean(),
-      message: z.string()
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: false
     }
   },
   async ({ deletions }) => {
@@ -1044,9 +1054,11 @@ server.registerTool(
     inputSchema: {
       relations: z.array(RelationSchema).describe("An array of relations to delete")
     },
-    outputSchema: {
-      success: z.boolean(),
-      message: z.string()
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: false
     }
   },
   async ({ relations }) => {
@@ -1065,9 +1077,9 @@ server.registerTool(
     title: "Read Graph",
     description: "Read the entire knowledge graph",
     inputSchema: {},
-    outputSchema: {
-      entities: z.array(EntitySchema),
-      relations: z.array(RelationSchema)
+    annotations: {
+      readOnlyHint: true,
+      openWorldHint: false
     }
   },
   async () => {
@@ -1112,13 +1124,9 @@ Examples:
       limit: z.number().optional()
         .describe("Maximum number of results to return")
     },
-    outputSchema: {
-      entities: z.array(EntitySchema),
-      relations: z.array(RelationSchema),
-      scores: z.array(z.object({
-        name: z.string(),
-        score: z.number()
-      })).optional()
+    annotations: {
+      readOnlyHint: true,
+      openWorldHint: false
     }
   },
   async ({ query, includeNeighbors, fuzzy, limit }) => {
@@ -1139,9 +1147,9 @@ server.registerTool(
     inputSchema: {
       names: z.array(z.string()).describe("An array of entity names to retrieve")
     },
-    outputSchema: {
-      entities: z.array(EntitySchema),
-      relations: z.array(RelationSchema)
+    annotations: {
+      readOnlyHint: true,
+      openWorldHint: false
     }
   },
   async ({ names }) => {
@@ -1166,12 +1174,9 @@ server.registerTool(
       relationType: z.string().optional()
         .describe("Filter by specific relation type (e.g., 'imports', 'calls')")
     },
-    outputSchema: {
-      neighbors: z.array(z.object({
-        entity: EntitySchema,
-        relation: RelationSchema,
-        direction: z.enum(['incoming', 'outgoing'])
-      }))
+    annotations: {
+      readOnlyHint: true,
+      openWorldHint: false
     }
   },
   async ({ entityName, direction, relationType }) => {
@@ -1194,10 +1199,9 @@ server.registerTool(
       toEntity: z.string().describe("The name of the target entity"),
       maxDepth: z.number().optional().describe("Maximum path length to search (default: 10)")
     },
-    outputSchema: {
-      path: z.array(EntitySchema).nullable(),
-      relations: z.array(RelationSchema).nullable(),
-      length: z.number().nullable()
+    annotations: {
+      readOnlyHint: true,
+      openWorldHint: false
     }
   },
   async ({ fromEntity, toEntity, maxDepth }) => {
@@ -1226,9 +1230,9 @@ server.registerTool(
       entityNames: z.array(z.string()).describe("Seed entity names to build the subgraph around"),
       depth: z.number().optional().describe("Number of hops to expand from seed entities (default: 1)")
     },
-    outputSchema: {
-      entities: z.array(EntitySchema),
-      relations: z.array(RelationSchema)
+    annotations: {
+      readOnlyHint: true,
+      openWorldHint: false
     }
   },
   async ({ entityNames, depth }) => {
@@ -1249,9 +1253,9 @@ server.registerTool(
     inputSchema: {
       entityType: z.string().describe("The entity type to filter by (case-insensitive)")
     },
-    outputSchema: {
-      entities: z.array(EntitySchema),
-      relations: z.array(RelationSchema)
+    annotations: {
+      readOnlyHint: true,
+      openWorldHint: false
     }
   },
   async ({ entityType }) => {
@@ -1274,9 +1278,9 @@ server.registerTool(
       fromEntity: z.string().optional().describe("Filter by source entity name"),
       toEntity: z.string().optional().describe("Filter by target entity name")
     },
-    outputSchema: {
-      relations: z.array(RelationSchema),
-      entities: z.array(EntitySchema)
+    annotations: {
+      readOnlyHint: true,
+      openWorldHint: false
     }
   },
   async ({ relationType, fromEntity, toEntity }) => {
@@ -1306,8 +1310,9 @@ Or provide a custom regex pattern.`,
     inputSchema: {
       pattern: z.string().describe("Pattern name (dated, techdebt, deprecated, purpose, quirk) or a custom regex")
     },
-    outputSchema: {
-      entities: z.array(EntitySchema)
+    annotations: {
+      readOnlyHint: true,
+      openWorldHint: false
     }
   },
   async ({ pattern }) => {
@@ -1347,14 +1352,9 @@ Examples:
       fuzzy: z.boolean().optional()
         .describe("Enable fuzzy matching for typo tolerance (default: false)")
     },
-    outputSchema: {
-      matches: z.array(z.object({
-        entityName: z.string(),
-        entityType: z.string(),
-        observation: z.string(),
-        score: z.number()
-      })),
-      entities: z.array(EntitySchema).optional()
+    annotations: {
+      readOnlyHint: true,
+      openWorldHint: false
     }
   },
   async ({ query, limit, includeEntity, fuzzy }) => {
@@ -1367,18 +1367,24 @@ Examples:
 );
 
 async function main() {
-  // Initialize memory file path with backward compatibility
-  MEMORY_FILE_PATH = await ensureMemoryFilePath();
+  try {
+    // Initialize memory file path with backward compatibility
+    MEMORY_FILE_PATH = await ensureMemoryFilePath();
+    console.error(`[better-memory-mcp] Memory file path: ${MEMORY_FILE_PATH}`);
 
-  // Initialize knowledge graph manager with the memory file path
-  knowledgeGraphManager = new KnowledgeGraphManager(MEMORY_FILE_PATH);
+    // Initialize knowledge graph manager with the memory file path
+    knowledgeGraphManager = new KnowledgeGraphManager(MEMORY_FILE_PATH);
 
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
-  console.error("Knowledge Graph MCP Server running on stdio");
+    const transport = new StdioServerTransport();
+    await server.connect(transport);
+    console.error("[better-memory-mcp] Server started successfully on stdio transport");
+  } catch (error) {
+    console.error("[better-memory-mcp] Failed to start server:", error);
+    throw error;
+  }
 }
 
 main().catch((error) => {
-  console.error("Fatal error in main():", error);
+  console.error("[better-memory-mcp] Fatal error in main():", error);
   process.exit(1);
 });

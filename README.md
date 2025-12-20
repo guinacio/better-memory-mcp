@@ -215,7 +215,19 @@ Example:
 
 ## Installation
 
-### Prerequisites
+### Option 1: Desktop Extension (Recommended)
+
+Install directly in Claude Desktop using the bundled extension:
+
+1. Download the latest `.mcpb` file from [Releases](https://github.com/guinacio/better-memory-mcp/releases)
+2. Open Claude Desktop
+3. Go to **Settings** → **Extensions**
+4. Click **Install from file** and select the `.mcpb` file
+5. Configure the memory file path when prompted (optional)
+
+### Option 2: Manual Installation
+
+#### Prerequisites
 
 1. Clone this repository
 2. Install dependencies and build:
@@ -224,13 +236,13 @@ Example:
    npm run build
    ```
 
-### Configuration
+#### Configuration
 
 The server can be configured using the following environment variable:
 
 - `MEMORY_FILE_PATH`: Path to the memory storage JSONL file (default: `memory.jsonl` in the server directory)
 
-## Usage with Claude Desktop
+#### Claude Desktop (Manual Config)
 
 Add this to your `claude_desktop_config.json`:
 
@@ -250,7 +262,7 @@ Add this to your `claude_desktop_config.json`:
 
 Replace `C:/path/to/better-memory-mcp` with the actual path to this repository.
 
-## Usage with VS Code
+#### VS Code
 
 Add the configuration to your MCP settings using one of these methods:
 
@@ -336,6 +348,14 @@ npm run watch
 ```sh
 npm test
 ```
+
+### Build Desktop Extension
+To build the `.mcpb` extension bundle:
+```sh
+npm run bundle
+```
+
+This creates a `better-memory-mcp.mcpb` file that can be installed directly in Claude Desktop.
 
 ## License
 
