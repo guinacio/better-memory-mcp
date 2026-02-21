@@ -28,7 +28,8 @@
     "validate": "npx @anthropic-ai/mcpb validate"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.25.1"
+    "@modelcontextprotocol/sdk": "^1.25.1",
+    "kuzu": "^0.11.3"
   },
   "devDependencies": {
     "@anthropic-ai/mcpb": "^2.1.2",

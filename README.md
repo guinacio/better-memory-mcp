@@ -4,6 +4,8 @@
 
 A full-featured persistent memory system using a local knowledge graph. This lets Claude remember information about the user across chats, with advanced search, graph traversal, and filtering capabilities.
 
+Storage backend: Kuzu graph database (primary), with one-time JSONL import support.
+
 ## What's New vs. @modelcontextprotocol/server-memory
 
 | Feature | server-memory | better-memory-mcp |
@@ -248,9 +250,17 @@ Install directly in Claude Desktop using the bundled extension:
 
 #### Configuration
 
-The server can be configured using the following environment variable:
+The server can be configured using the following environment variables:
 
-- `MEMORY_FILE_PATH`: Path to the memory storage JSONL file (default: `memory.jsonl` in the server directory)
+- `KUZU_DB_PATH`: Path to the Kuzu database file (default: `memory.kuzu` in the server directory)
+- `MEMORY_FILE_PATH`: Legacy JSONL path used for one-time import into Kuzu on first startup (default: `memory.jsonl` in the server directory)
+
+### Migration behavior (JSONL -> Kuzu)
+
+- On startup, the server bootstraps Kuzu schema and checks whether JSONL import already ran.
+- If `MEMORY_FILE_PATH` exists and no import marker exists, it imports entities/relations from JSONL once.
+- Import is idempotent at startup via a marker file: `<KUZU_DB_PATH>.jsonl_imported`.
+- Runtime reads/writes use Kuzu only (JSONL is not used as live storage).
 
 #### Claude Desktop (Manual Config)
 
@@ -263,7 +273,8 @@ Add this to your `claude_desktop_config.json`:
       "command": "node",
       "args": ["C:/path/to/better-memory-mcp/dist/index.js"],
       "env": {
-        "MEMORY_FILE_PATH": "C:/path/to/your/memory.jsonl"
+        "KUZU_DB_PATH": "C:/path/to/your/memory.kuzu",
+        "MEMORY_FILE_PATH": "C:/path/to/your/legacy-memory.jsonl"
       }
     }
   }
@@ -289,7 +300,8 @@ Add the configuration to `.vscode/mcp.json` in your workspace.
       "command": "node",
       "args": ["C:/path/to/better-memory-mcp/dist/index.js"],
       "env": {
-        "MEMORY_FILE_PATH": "C:/path/to/your/memory.jsonl"
+        "KUZU_DB_PATH": "C:/path/to/your/memory.kuzu",
+        "MEMORY_FILE_PATH": "C:/path/to/your/legacy-memory.jsonl"
       }
     }
   }

@@ -6,9 +6,11 @@ import { z } from "zod";
 import { promises as fs } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { KuzuGraphStore } from './kuzu-store.js';
 
 // Define memory file path using environment variable with fallback
 export const defaultMemoryPath = path.join(path.dirname(fileURLToPath(import.meta.url)), 'memory.jsonl');
+export const defaultKuzuPath = path.join(path.dirname(fileURLToPath(import.meta.url)), 'memory.kuzu');
 
 // Handle backward compatibility: migrate memory.json to memory.jsonl if needed
 export async function ensureMemoryFilePath(): Promise<string> {
@@ -45,6 +47,17 @@ export async function ensureMemoryFilePath(): Promise<string> {
 
 // Initialize memory file path (will be set during startup)
 let MEMORY_FILE_PATH: string;
+let KUZU_DB_PATH: string;
+
+// Resolve Kuzu DB path from env (absolute or project-relative)
+export async function ensureKuzuDbPath(): Promise<string> {
+  if (process.env.KUZU_DB_PATH) {
+    return path.isAbsolute(process.env.KUZU_DB_PATH)
+      ? process.env.KUZU_DB_PATH
+      : path.join(path.dirname(fileURLToPath(import.meta.url)), process.env.KUZU_DB_PATH);
+  }
+  return defaultKuzuPath;
+}
 
 // We are storing our memory using entities, relations, and observations in a graph structure
 export interface Entity {
@@ -135,7 +148,20 @@ export interface ObservationSearchResult {
 
 // The KnowledgeGraphManager class contains all operations to interact with the knowledge graph
 export class KnowledgeGraphManager {
-  constructor(private memoryFilePath: string) {}
+  private store: KuzuGraphStore;
+  private ready: Promise<void>;
+  private resolvedKuzuDbPath: string;
+
+  constructor(private memoryFilePath: string, kuzuDbPath?: string) {
+    this.resolvedKuzuDbPath = kuzuDbPath ?? `${this.memoryFilePath}.kuzu`;
+    this.store = new KuzuGraphStore(this.resolvedKuzuDbPath);
+    this.ready = this.initializeStore();
+  }
+
+  private async initializeStore(): Promise<void> {
+    await this.store.bootstrapSchema();
+    await this.store.importFromJsonlIfNeeded(this.memoryFilePath);
+  }
 
   // ==================== Search Helper Methods ====================
 
@@ -344,47 +370,13 @@ export class KnowledgeGraphManager {
   // ==================== Core Data Methods ====================
 
   private async loadGraph(): Promise<KnowledgeGraph> {
-    try {
-      const data = await fs.readFile(this.memoryFilePath, "utf-8");
-      const lines = data.split("\n").filter(line => line.trim() !== "");
-      return lines.reduce((graph: KnowledgeGraph, line) => {
-        const item = JSON.parse(line);
-        if (item.type === "entity") {
-          // Strip internal 'type' field to match Entity interface
-          const { type, ...entity } = item;
-          graph.entities.push(entity as Entity);
-        }
-        if (item.type === "relation") {
-          // Strip internal 'type' field to match Relation interface
-          const { type, ...relation } = item;
-          graph.relations.push(relation as Relation);
-        }
-        return graph;
-      }, { entities: [], relations: [] });
-    } catch (error) {
-      if (error instanceof Error && 'code' in error && (error as any).code === "ENOENT") {
-        return { entities: [], relations: [] };
-      }
-      throw error;
-    }
+    await this.ready;
+    return this.store.readGraph();
   }
 
   private async saveGraph(graph: KnowledgeGraph): Promise<void> {
-    const lines = [
-      ...graph.entities.map(e => JSON.stringify({
-        type: "entity",
-        name: e.name,
-        entityType: e.entityType,
-        observations: e.observations
-      })),
-      ...graph.relations.map(r => JSON.stringify({
-        type: "relation",
-        from: r.from,
-        to: r.to,
-        relationType: r.relationType
-      })),
-    ];
-    await fs.writeFile(this.memoryFilePath, lines.join("\n"));
+    await this.ready;
+    await this.store.replaceGraph(graph);
   }
 
   async createEntities(entities: Entity[]): Promise<Entity[]> {
@@ -891,6 +883,11 @@ export class KnowledgeGraphManager {
 
     return result;
   }
+
+  async close(): Promise<void> {
+    await this.ready;
+    this.store.close();
+  }
 }
 
 let knowledgeGraphManager: KnowledgeGraphManager;
@@ -1370,10 +1367,12 @@ async function main() {
   try {
     // Initialize memory file path with backward compatibility
     MEMORY_FILE_PATH = await ensureMemoryFilePath();
+    KUZU_DB_PATH = await ensureKuzuDbPath();
     console.error(`[better-memory-mcp] Memory file path: ${MEMORY_FILE_PATH}`);
+    console.error(`[better-memory-mcp] Kuzu DB path: ${KUZU_DB_PATH}`);
 
-    // Initialize knowledge graph manager with the memory file path
-    knowledgeGraphManager = new KnowledgeGraphManager(MEMORY_FILE_PATH);
+    // Initialize knowledge graph manager with Kuzu as the source of truth.
+    knowledgeGraphManager = new KnowledgeGraphManager(MEMORY_FILE_PATH, KUZU_DB_PATH);
 
     const transport = new StdioServerTransport();
     await server.connect(transport);
@@ -1384,7 +1383,13 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  console.error("[better-memory-mcp] Fatal error in main():", error);
-  process.exit(1);
-});
+const isDirectRun =
+  !!process.argv[1] &&
+  path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+
+if (isDirectRun) {
+  main().catch((error) => {
+    console.error("[better-memory-mcp] Fatal error in main():", error);
+    process.exit(1);
+  });
+}

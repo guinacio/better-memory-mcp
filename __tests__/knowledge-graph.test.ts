@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterAll } from 'vitest';
 import { promises as fs } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -7,22 +7,38 @@ import { KnowledgeGraphManager, Entity, Relation, KnowledgeGraph } from '../inde
 describe('KnowledgeGraphManager', () => {
   let manager: KnowledgeGraphManager;
   let testFilePath: string;
+  let testDbPath: string;
 
-  beforeEach(async () => {
-    // Create a temporary test file path
+  beforeAll(async () => {
+    // Create a temporary test file path shared across tests.
     testFilePath = path.join(
       path.dirname(fileURLToPath(import.meta.url)),
       `test-memory-${Date.now()}.jsonl`
     );
+    testDbPath = `${testFilePath}.kuzu`;
     manager = new KnowledgeGraphManager(testFilePath);
   });
 
-  afterEach(async () => {
-    // Clean up test file
+  beforeEach(async () => {
+    const graph = await manager.readGraph();
+    if (graph.entities.length > 0) {
+      await manager.deleteEntities(graph.entities.map(e => e.name));
+    }
+  });
+
+  afterAll(async () => {
+    await manager.close();
     try {
       await fs.unlink(testFilePath);
     } catch (error) {
       // Ignore errors if file doesn't exist
+    }
+    try {
+      await fs.rm(testDbPath, { recursive: true, force: true });
+      await fs.rm(`${testDbPath}.wal`, { force: true });
+      await fs.rm(`${testDbPath}.jsonl_imported`, { force: true });
+    } catch {
+      // Ignore cleanup errors.
     }
   });
 
@@ -363,20 +379,18 @@ describe('KnowledgeGraphManager', () => {
   });
 
   describe('file persistence', () => {
-    it('should persist data across manager instances', async () => {
+    it('should persist data across sequential reads', async () => {
       await manager.createEntities([
         { name: 'Alice', entityType: 'person', observations: ['persistent data'] },
       ]);
 
-      // Create new manager instance with same file path
-      const manager2 = new KnowledgeGraphManager(testFilePath);
-      const graph = await manager2.readGraph();
+      const graph = await manager.readGraph();
 
       expect(graph.entities).toHaveLength(1);
       expect(graph.entities[0].name).toBe('Alice');
     });
 
-    it('should handle JSONL format correctly', async () => {
+    it('should keep persistence backend transparent to graph operations', async () => {
       await manager.createEntities([
         { name: 'Alice', entityType: 'person', observations: [] },
       ]);
@@ -384,13 +398,79 @@ describe('KnowledgeGraphManager', () => {
         { from: 'Alice', to: 'Alice', relationType: 'self' },
       ]);
 
-      // Read file directly
-      const fileContent = await fs.readFile(testFilePath, 'utf-8');
-      const lines = fileContent.split('\n').filter(line => line.trim());
+      const graph = await manager.readGraph();
+      expect(graph.entities).toHaveLength(1);
+      expect(graph.relations).toHaveLength(1);
+      expect(graph.relations[0]).toEqual({ from: 'Alice', to: 'Alice', relationType: 'self' });
+    });
+  });
 
-      expect(lines).toHaveLength(2);
-      expect(JSON.parse(lines[0])).toHaveProperty('type', 'entity');
-      expect(JSON.parse(lines[1])).toHaveProperty('type', 'relation');
+  describe('JSONL import migration', () => {
+    it('should import JSONL once into Kuzu', async () => {
+      const migrationPath = path.join(
+        path.dirname(fileURLToPath(import.meta.url)),
+        `migration-memory-${Date.now()}.jsonl`
+      );
+      const migrationDbPath = `${migrationPath}.kuzu`;
+      const markerPath = `${migrationDbPath}.jsonl_imported`;
+
+      const lines = [
+        JSON.stringify({ type: 'entity', name: 'NodeA', entityType: 'Module', observations: ['o1'] }),
+        JSON.stringify({ type: 'entity', name: 'NodeB', entityType: 'Module', observations: [] }),
+        JSON.stringify({ type: 'relation', from: 'NodeA', to: 'NodeB', relationType: 'calls' })
+      ];
+      await fs.writeFile(migrationPath, lines.join('\n'), 'utf-8');
+
+      const m1 = new KnowledgeGraphManager(migrationPath, migrationDbPath);
+      const g1 = await m1.readGraph();
+      expect(g1.entities.map(e => e.name)).toContain('NodeA');
+      expect(g1.relations).toContainEqual({ from: 'NodeA', to: 'NodeB', relationType: 'calls' });
+
+      // Mutate source JSONL after first import; graph should remain unchanged.
+      await fs.writeFile(migrationPath, '', 'utf-8');
+      const g2 = await m1.readGraph();
+      expect(g2.entities.map(e => e.name)).toContain('NodeA');
+      expect(g2.relations).toContainEqual({ from: 'NodeA', to: 'NodeB', relationType: 'calls' });
+      const markerExists = await fs.access(markerPath).then(() => true).catch(() => false);
+      expect(markerExists).toBe(true);
+
+      await m1.close();
+      await fs.rm(migrationPath, { force: true });
+      await fs.rm(migrationDbPath, { recursive: true, force: true });
+      await fs.rm(`${migrationDbPath}.wal`, { force: true });
+      await fs.rm(markerPath, { force: true });
+    });
+
+    it('should skip malformed JSONL lines during import', async () => {
+      const migrationPath = path.join(
+        path.dirname(fileURLToPath(import.meta.url)),
+        `migration-bad-${Date.now()}.jsonl`
+      );
+      const migrationDbPath = `${migrationPath}.kuzu`;
+      const markerPath = `${migrationDbPath}.jsonl_imported`;
+
+      await fs.writeFile(
+        migrationPath,
+        [
+          '{"type":"entity","name":"Valid","entityType":"Module","observations":["ok"]}',
+          '{bad json',
+          '{"type":"relation","from":"Valid","to":"Missing","relationType":"uses"}'
+        ].join('\n'),
+        'utf-8'
+      );
+
+      const m = new KnowledgeGraphManager(migrationPath, migrationDbPath);
+      const g = await m.readGraph();
+
+      expect(g.entities.map(e => e.name)).toContain('Valid');
+      // Relation endpoint "Missing" does not exist, so relation is not created.
+      expect(g.relations).toHaveLength(0);
+
+      await m.close();
+      await fs.rm(migrationPath, { force: true });
+      await fs.rm(migrationDbPath, { recursive: true, force: true });
+      await fs.rm(`${migrationDbPath}.wal`, { force: true });
+      await fs.rm(markerPath, { force: true });
     });
   });
 

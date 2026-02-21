@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { promises as fs } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { ensureMemoryFilePath, defaultMemoryPath } from '../index.js';
+import { ensureMemoryFilePath, ensureKuzuDbPath, defaultMemoryPath, defaultKuzuPath } from '../index.js';
 
 describe('ensureMemoryFilePath', () => {
   const testDir = path.dirname(fileURLToPath(import.meta.url));
@@ -10,12 +10,15 @@ describe('ensureMemoryFilePath', () => {
   const newMemoryPath = path.join(testDir, '..', 'memory.jsonl');
 
   let originalEnv: string | undefined;
+  let originalKuzuEnv: string | undefined;
 
   beforeEach(() => {
     // Save original environment variable
     originalEnv = process.env.MEMORY_FILE_PATH;
+    originalKuzuEnv = process.env.KUZU_DB_PATH;
     // Delete environment variable
     delete process.env.MEMORY_FILE_PATH;
+    delete process.env.KUZU_DB_PATH;
   });
 
   afterEach(async () => {
@@ -24,6 +27,11 @@ describe('ensureMemoryFilePath', () => {
       process.env.MEMORY_FILE_PATH = originalEnv;
     } else {
       delete process.env.MEMORY_FILE_PATH;
+    }
+    if (originalKuzuEnv !== undefined) {
+      process.env.KUZU_DB_PATH = originalKuzuEnv;
+    } else {
+      delete process.env.KUZU_DB_PATH;
     }
 
     // Clean up test files
@@ -151,6 +159,20 @@ describe('ensureMemoryFilePath', () => {
 
     it('should be an absolute path', () => {
       expect(path.isAbsolute(defaultMemoryPath)).toBe(true);
+    });
+  });
+
+  describe('ensureKuzuDbPath', () => {
+    it('should return default Kuzu path when KUZU_DB_PATH is not set', async () => {
+      const result = await ensureKuzuDbPath();
+      expect(result).toBe(defaultKuzuPath);
+    });
+
+    it('should resolve relative KUZU_DB_PATH to absolute path', async () => {
+      process.env.KUZU_DB_PATH = 'custom.kuzu';
+      const result = await ensureKuzuDbPath();
+      expect(path.isAbsolute(result)).toBe(true);
+      expect(result).toContain('custom.kuzu');
     });
   });
 });
